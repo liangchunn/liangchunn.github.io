@@ -1,6 +1,6 @@
 ---
 title: Using Express with Strictly Typed Handlers and Responses
-date: '2019-01-03T16:21:10.926Z'
+date: "2019-01-03T16:21:10.926Z"
 ---
 
 I've recently came across a problem where I really didn't know how to approach,
@@ -77,7 +77,7 @@ Here's an example of a response creator that creates an `IResponseSuccessJson`
 returning a JSON with the status 200:
 
 ```typescript
-interface IResponseSuccessJson<T> extends IResponse<'IResponseSuccessJson'> {
+interface IResponseSuccessJson<T> extends IResponse<"IResponseSuccessJson"> {
   readonly value: T
 }
 
@@ -88,7 +88,7 @@ function ResponseSuccessJson<T>(o: T): IResponseSuccessJson<T> {
         ...o,
         kind: undefined,
       }),
-    kind: 'IResponseSuccessJson',
+    kind: "IResponseSuccessJson",
     value: o,
   }
 }
@@ -99,7 +99,7 @@ function ResponseSuccessJson<T>(o: T): IResponseSuccessJson<T> {
 And here we have the same thing but returning a status of 400:
 
 ```typescript
-interface IResponseFailJson<T> extends IResponse<'IResponseFailJson'> {
+interface IResponseFailJson<T> extends IResponse<"IResponseFailJson"> {
   readonly value: T
 }
 
@@ -110,7 +110,7 @@ function ResponseFailJson<T>(o: T): IResponseFailJson<T> {
         ...o,
         kind: undefined,
       }),
-    kind: 'IResponseFailJson',
+    kind: "IResponseFailJson",
     value: o,
   }
 }
@@ -126,7 +126,7 @@ chain has to be stopped and a response has to be send immediately (more on this
 later).
 
 ```typescript
-import { Either } from 'fp-ts/lib/Either'
+import { Either } from "fp-ts/lib/Either"
 
 type IRequestMiddleware<E, R> = (
   request: express.Request
@@ -206,7 +206,7 @@ we _resolve_ the left value and bail out from the middleware chain; otherwise,
 we continue processing the next middleware.
 
 ```typescript
-import { isLeft } from 'fp-ts/lib/Either'
+import { isLeft } from "fp-ts/lib/Either"
 
 function withRequestMiddlewares<E1, E2, R1, R2>(
   m1: IRequestMiddleware<E1, R1>,
@@ -344,11 +344,11 @@ Using the predefined `requestHandler` with Express is as easy as wrapping the
 request handler with `wrapRequestHandler`:
 
 ```typescript
-import * as express from 'express'
+import * as express from "express"
 
 const app = express()
 
-app.get('/api/test', wrapRequestHandler(requestHandler))
+app.get("/api/test", wrapRequestHandler(requestHandler))
 ```
 
 ## Recap

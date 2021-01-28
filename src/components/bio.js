@@ -57,13 +57,9 @@ const Bio = () => {
           {` `}
           You can find him on
           {` `}
-          <a href={`https://github.com/${social?.github || ``}`}>
-            GitHub
-          </a>
+          <a href={`https://github.com/${social?.github || ``}`}>GitHub</a>
           {` and `}
-          <a href={`https://twitter.com/${social?.twitter || ``}`}>
-            Twitter
-          </a>
+          <a href={`https://twitter.com/${social?.twitter || ``}`}>Twitter</a>
         </p>
       )}
     </div>
