@@ -3,7 +3,7 @@ title: Sleep in Async Contexts
 date: "2023-06-16T11:55:05.157Z"
 ---
 
-I recently built a Rust library that allows you to query Impala databases for an API that needs to query data from Impala.
+I recently built a Rust library that allows you to query Impala databases for an API.
 
 The library interfaces with an Impala database via the Thrift interface, namely via the interface defined by the [`TCLIService.thrift`](https://github.com/apache/hive/blob/master/service-rpc/if/TCLIService.thrift) definition file. Using the Apache Thrift CLI tool, the bindings file for Rust can be generated to be used with the [`thrift`](https://crates.io/crates/thrift) crate.
 
