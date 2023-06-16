@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[TypeError]]></title><description><![CDATA[Random things I babble about]]></description><link>https://blog.liangchun.me</link><generator>GatsbyJS</generator><lastBuildDate>Fri, 16 Jun 2023 13:19:29 GMT</lastBuildDate><item><title><![CDATA[Sleep in Async Contexts]]></title><description><![CDATA[I recently built a Rust library that allows you to query Impala databases for an API that needs to query data from Impala. The library…]]></description><link>https://blog.liangchun.me/sleep-in-async-context/</link><guid isPermaLink="false">https://blog.liangchun.me/sleep-in-async-context/</guid><pubDate>Fri, 16 Jun 2023 11:55:05 GMT</pubDate><content:encoded>&lt;p&gt;I recently built a Rust library that allows you to query Impala databases for an API that needs to query data from Impala.&lt;/p&gt;
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[TypeError]]></title><description><![CDATA[Random things I babble about]]></description><link>https://blog.liangchun.me</link><generator>GatsbyJS</generator><lastBuildDate>Fri, 16 Jun 2023 15:03:48 GMT</lastBuildDate><item><title><![CDATA[Sleep in Async Contexts]]></title><description><![CDATA[I recently built a Rust library that allows you to query Impala databases for an API that needs to query data from Impala. The library…]]></description><link>https://blog.liangchun.me/sleep-in-async-context/</link><guid isPermaLink="false">https://blog.liangchun.me/sleep-in-async-context/</guid><pubDate>Fri, 16 Jun 2023 11:55:05 GMT</pubDate><content:encoded>&lt;p&gt;I recently built a Rust library that allows you to query Impala databases for an API that needs to query data from Impala.&lt;/p&gt;
 &lt;p&gt;The library interfaces with an Impala database via the Thrift interface, namely via the interface defined by the &lt;a href=&quot;https://github.com/apache/hive/blob/master/service-rpc/if/TCLIService.thrift&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;TCLIService.thrift&lt;/code&gt;&lt;/a&gt; definition file. Using the Apache Thrift CLI tool, the bindings file for Rust can be generated to be used with the &lt;a href=&quot;https://crates.io/crates/thrift&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;thrift&lt;/code&gt;&lt;/a&gt; crate.&lt;/p&gt;
 &lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;sh&quot;&gt;&lt;pre class=&quot;language-sh&quot;&gt;&lt;code class=&quot;language-sh&quot;&gt;thrift -out src --gen rs -r ./thrift/TCLIService.thrift&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;The synchronous API was first built to test things out (which involves a lot of transformations like transposing rows, getting metadata, and more shenanigans). Then the asynchronous API was built with the help of &lt;code class=&quot;language-text&quot;&gt;bb8&lt;/code&gt; and &lt;code class=&quot;language-text&quot;&gt;thrift-pool&lt;/code&gt; which allows the underlying TCP connections to be reused since they are expensive to reopen every time a query fires.&lt;/p&gt;
@@ -11,26 +11,89 @@
 &lt;h3&gt;Shipping it&lt;/h3&gt;
 &lt;p&gt;On the day of release, multiple users reported that there was issues loading resources from the API. They were being timed out constantly.&lt;/p&gt;
 &lt;p&gt;Looking at the logs, I found that some routes on the server which were not supposed to be slow, &lt;strong&gt;were slow&lt;/strong&gt;.&lt;/p&gt;
-&lt;p&gt;An example is the auth route. This route checks if your auth cookie is still valid, and it should be nearly instant (!), but it was taking &lt;strong&gt;more than 4 seconds&lt;/strong&gt;, and sometimes even &lt;strong&gt;more than 10 seconds&lt;/strong&gt; to be processed. When this happens, it triggers Google Cloud to timeout the request and return a HTTP 408.&lt;/p&gt;
+&lt;p&gt;An example is the &lt;code class=&quot;language-text&quot;&gt;/auth&lt;/code&gt; route. This route checks if your auth cookie is still valid, and it should be nearly instant (!), but it was taking &lt;strong&gt;more than 4 seconds&lt;/strong&gt;, and sometimes even &lt;strong&gt;more than 10 seconds&lt;/strong&gt; to be processed. When this happens, it triggers Google Cloud to timeout the request and return a HTTP 408, causing cascading errors to the users.&lt;/p&gt;
 &lt;h3&gt;The investigation&lt;/h3&gt;
-&lt;p&gt;I tried to reproduce the issue on my local machine by limiting the server to only utilise 1 thread, firing the slow request, and then firing multiple requests that were not supposed to be slow in quick succession.&lt;/p&gt;
-&lt;p&gt;As expected (not to my advantage), the supposedly fast requests were being slow, and they were &lt;em&gt;suspiciously slow&lt;/em&gt; because the response times were &lt;em&gt;almost the same&lt;/em&gt; as the slow request!&lt;/p&gt;
+&lt;p&gt;I tried to reproduce the issue on my local machine by limiting the server to only utilise 1 thread, firing requests to the slow endpoint, and then firing multiple requests to the fast endpoint in quick succession.&lt;/p&gt;
+&lt;p&gt;As expected (not to my advantage), the supposedly fast requests to &lt;code class=&quot;language-text&quot;&gt;/auth&lt;/code&gt; were being slow, and they were &lt;em&gt;suspiciously slow&lt;/em&gt; because the response times were &lt;em&gt;almost the same&lt;/em&gt; as the slow request on &lt;code class=&quot;language-text&quot;&gt;/chart&lt;/code&gt;!&lt;/p&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/de37d0fcbff92545dca3adb5a4283ed5/e4611/sleep-before.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 20.88607594936709%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAECAYAAACOXx+WAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA60lEQVQY0yXO23KCMBRGYd//lXpv7WFsPSIgh5AQJDUpVEXQcVYB98y+/Nd8Ez9vmHqOl0/JbOdYiCvTtcaTJy5Nh1QF7x9zvhdrdv6eKM5YLLcEYUzTtBhjiKKYojgw3ES7Dk9d2Ig/wqIdf6dOKHul6+4c7S9xIkiFHOPGWDKZo4uS2+1OVdeUpeF8Pj+DYXHlza9G4atnWcmW2bYkyC+jUOUH5l9LVmuPcJ+QpJLN1mcfiVHonEMIgda6B9yewmG8ShxeVhOXLYGqyY8NXS+wrurHCWk6CDXmxyIyNQqHQN0Lh5i1lsfjwT/JSSdl/i66+QAAAABJRU5ErkJggg==&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;image showing slow requests to /auth and /chart&quot;
+        title=&quot;image showing slow requests to /auth and /chart&quot;
+        src=&quot;/static/de37d0fcbff92545dca3adb5a4283ed5/f058b/sleep-before.png&quot;
+        srcset=&quot;/static/de37d0fcbff92545dca3adb5a4283ed5/c26ae/sleep-before.png 158w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/6bdcf/sleep-before.png 315w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/f058b/sleep-before.png 630w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/40601/sleep-before.png 945w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/78612/sleep-before.png 1260w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/e4611/sleep-before.png 1298w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
 &lt;h3&gt;The problem&lt;/h3&gt;
 &lt;p&gt;As the title suggests, the problem is caused by the &lt;strong&gt;usage of &lt;code class=&quot;language-text&quot;&gt;std::thread::sleep&lt;/code&gt; in an &lt;code class=&quot;language-text&quot;&gt;async&lt;/code&gt; context&lt;/strong&gt;.&lt;/p&gt;
-&lt;div class=&quot;gatsby-highlight has-highlighted-lines&quot; data-language=&quot;rust&quot;&gt;&lt;pre class=&quot;language-rust&quot;&gt;&lt;code class=&quot;language-rust&quot;&gt;&lt;span class=&quot;token keyword&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;token operator&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;token macro property&quot;&gt;matches!&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;
-    response&lt;span class=&quot;token punctuation&quot;&gt;.&lt;/span&gt;operation_state&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt;
-    &lt;span class=&quot;token class-name&quot;&gt;Some&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;TOperationState&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;token constant&quot;&gt;RUNNING_STATE&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;
-        &lt;span class=&quot;token operator&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;token class-name&quot;&gt;Some&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;TOperationState&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;token constant&quot;&gt;PENDING_STATE&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;
-        &lt;span class=&quot;token operator&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;token class-name&quot;&gt;Some&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;TOperationState&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;token constant&quot;&gt;INITIALIZED_STATE&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;
-    &lt;span class=&quot;token namespace&quot;&gt;log&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;token macro property&quot;&gt;info!&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&quot;execute operation done in {:?}&quot;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt; start&lt;span class=&quot;token punctuation&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;token function&quot;&gt;elapsed&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;
-    &lt;span class=&quot;token keyword&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;token class-name&quot;&gt;Ok&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;token keyword&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;
+&lt;div class=&quot;gatsby-highlight has-highlighted-lines&quot; data-language=&quot;rust&quot;&gt;&lt;pre class=&quot;language-rust&quot;&gt;&lt;code class=&quot;language-rust&quot;&gt;&lt;span class=&quot;token keyword&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;token keyword&quot;&gt;fn&lt;/span&gt; &lt;span class=&quot;token function-definition function&quot;&gt;wait_to_finish&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;token operator&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;token keyword&quot;&gt;mut&lt;/span&gt; &lt;span class=&quot;token keyword&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt;
+    op&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token operator&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;TOperationHandle&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt;
+    start&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token operator&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;Instant&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;-&gt;&lt;/span&gt; &lt;span class=&quot;token namespace&quot;&gt;thrift&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;Result&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&gt;&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;token comment&quot;&gt;// ...&lt;/span&gt;
+
     &lt;span class=&quot;token keyword&quot;&gt;let&lt;/span&gt; sleep_duration &lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;token function&quot;&gt;get_sleep_duration&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;start&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;
     &lt;span class=&quot;token namespace&quot;&gt;log&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;token macro property&quot;&gt;trace!&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&quot; sleeping for {:.2?}&quot;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt; sleep_duration&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;gatsby-highlight-code-line&quot;&gt;    &lt;span class=&quot;token comment&quot;&gt;// Oops!&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;gatsby-highlight-code-line&quot;&gt;    &lt;span class=&quot;token namespace&quot;&gt;std&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;thread&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;token function&quot;&gt;sleep&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;sleep_duration&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;/span&gt;    &lt;span class=&quot;token keyword&quot;&gt;continue&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;gatsby-highlight-code-line&quot;&gt;    &lt;span class=&quot;token comment&quot;&gt;// Oops!&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;gatsby-highlight-code-line&quot;&gt;    &lt;span class=&quot;token namespace&quot;&gt;std&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;thread&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;token function&quot;&gt;sleep&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;sleep_duration&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;/span&gt;
+    &lt;span class=&quot;token comment&quot;&gt;// ...&lt;/span&gt;
 &lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;I promptly switched the implementation to use &lt;code class=&quot;language-text&quot;&gt;tokio::time::sleep&lt;/code&gt; instead (which fixed the issue), as the documentation of &lt;code class=&quot;language-text&quot;&gt;std::thread::sleep&lt;/code&gt; says:&lt;/p&gt;
+&lt;p&gt;I promptly switched the implementation to use &lt;code class=&quot;language-text&quot;&gt;tokio::time::sleep&lt;/code&gt; instead, which fixed the issue:&lt;/p&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/19109672c12aa180165a67f2083b0ae4/dcccd/sleep-after.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 20.253164556962027%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAECAYAAACOXx+WAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA8ElEQVQY002P3W6CQBBGef/HappeNFpRqi5/WwVx2YAKAkXKyumG3nSSSSZzcb7vONllYC3vbGTNPm3w5JWmf1LVdw7JCT+IiOSBTGkOx5Q0U1xvFY/Hg6Io0FpjjGGapnmdtBx492+8eppt0rIQmnaApmnYiYCV6/G5E2TnnDD+wg9jC6zp+2+EsP8s4/84eTVaUMdHcGUVVcTasIlKYtXxYybbtCGM5Aw62XZKFxzTbL6Nec7BKs8py5JxHHFOl5FFWPOyVrxtC1zZsvRLhNXv+oHcAhZLF3ftIax+kp7Z+yFBKGm7blaO4xil/gJ+AQF5KHdt5phKAAAAAElFTkSuQmCC&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;image showing after fixes of faster /auth route&quot;
+        title=&quot;image showing after fixes of faster /auth route&quot;
+        src=&quot;/static/19109672c12aa180165a67f2083b0ae4/f058b/sleep-after.png&quot;
+        srcset=&quot;/static/19109672c12aa180165a67f2083b0ae4/c26ae/sleep-after.png 158w,
+/static/19109672c12aa180165a67f2083b0ae4/6bdcf/sleep-after.png 315w,
+/static/19109672c12aa180165a67f2083b0ae4/f058b/sleep-after.png 630w,
+/static/19109672c12aa180165a67f2083b0ae4/40601/sleep-after.png 945w,
+/static/19109672c12aa180165a67f2083b0ae4/dcccd/sleep-after.png 1127w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;The documentation of &lt;code class=&quot;language-text&quot;&gt;std::thread::sleep&lt;/code&gt; says:&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;Puts the current thread to sleep for at least the specified amount of time.&lt;/p&gt;
 &lt;p&gt;The thread may sleep longer than the duration specified due to scheduling specifics or
@@ -49,9 +112,9 @@ platform-dependent functionality. It will never sleep less.&lt;/p&gt;
     &lt;span class=&quot;token keyword&quot;&gt;fn&lt;/span&gt; &lt;span class=&quot;token function-definition function&quot;&gt;poll&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;token keyword&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token class-name&quot;&gt;Pin&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;token keyword&quot;&gt;mut&lt;/span&gt; &lt;span class=&quot;token keyword&quot;&gt;Self&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&gt;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;,&lt;/span&gt; cx&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token operator&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;token keyword&quot;&gt;mut&lt;/span&gt; &lt;span class=&quot;token class-name&quot;&gt;Context&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;token lifetime-annotation symbol&quot;&gt;&apos;_&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&gt;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;-&gt;&lt;/span&gt; &lt;span class=&quot;token class-name&quot;&gt;Poll&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;token keyword&quot;&gt;Self&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;token class-name&quot;&gt;Output&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;&gt;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;
 &lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;blockquote&gt;
-&lt;p&gt;&lt;code class=&quot;language-text&quot;&gt;Pin&lt;/code&gt;? &lt;code class=&quot;language-text&quot;&gt;Poll&lt;/code&gt;? What the hell is this? Let me see… oh, okay nevermind.&lt;/p&gt;
+&lt;p&gt;&lt;code class=&quot;language-text&quot;&gt;Pin&lt;/code&gt;? &lt;code class=&quot;language-text&quot;&gt;Poll&lt;/code&gt;? What the hell is this? Let me see the definitions… oh, okay nevermind.&lt;/p&gt;
 &lt;/blockquote&gt;
-&lt;p&gt;Suffice to say I quietly stepped away from this, and I just &lt;em&gt;never&lt;/em&gt; return &lt;code class=&quot;language-text&quot;&gt;Future&lt;/code&gt;-y things from functions or even try to touch &lt;code class=&quot;language-text&quot;&gt;Future&lt;/code&gt; related things by using &lt;code class=&quot;language-text&quot;&gt;async fn&lt;/code&gt; and &lt;code class=&quot;language-text&quot;&gt;.await&lt;/code&gt; everywhere that I could. Maybe one day I am able to muster the confidence to &lt;em&gt;truly&lt;/em&gt; understand it.&lt;/p&gt;
+&lt;p&gt;Suffice to say I quietly stepped away from this, and I just &lt;em&gt;never&lt;/em&gt; return &lt;code class=&quot;language-text&quot;&gt;Future&lt;/code&gt;-y things from functions or even try to touch &lt;code class=&quot;language-text&quot;&gt;Future&lt;/code&gt; related things by using &lt;code class=&quot;language-text&quot;&gt;async fn&lt;/code&gt; and &lt;code class=&quot;language-text&quot;&gt;.await&lt;/code&gt; everywhere that I could. Maybe one day I am able to muster the confidence and invest time to &lt;em&gt;truly&lt;/em&gt; understand the underlying mechanism of &lt;code class=&quot;language-text&quot;&gt;Future&lt;/code&gt;s.&lt;/p&gt;
 &lt;p&gt;Don’t get me wrong, I am quite satisfied with how Rust handles async and being extremely explicit, but I do wish there was some tool that would have caught this issue for me, which would have in turn make working with &lt;code class=&quot;language-text&quot;&gt;async&lt;/code&gt; easier.&lt;/p&gt;
 &lt;h3&gt;Take aways&lt;/h3&gt;
 &lt;p&gt;Some key take-aways:&lt;/p&gt;

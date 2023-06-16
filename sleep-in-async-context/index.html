@@ -14,26 +14,89 @@
 <h3>Shipping it</h3>
 <p>On the day of release, multiple users reported that there was issues loading resources from the API. They were being timed out constantly.</p>
 <p>Looking at the logs, I found that some routes on the server which were not supposed to be slow, <strong>were slow</strong>.</p>
-<p>An example is the auth route. This route checks if your auth cookie is still valid, and it should be nearly instant (!), but it was taking <strong>more than 4 seconds</strong>, and sometimes even <strong>more than 10 seconds</strong> to be processed. When this happens, it triggers Google Cloud to timeout the request and return a HTTP 408.</p>
+<p>An example is the <code class="language-text">/auth</code> route. This route checks if your auth cookie is still valid, and it should be nearly instant (!), but it was taking <strong>more than 4 seconds</strong>, and sometimes even <strong>more than 10 seconds</strong> to be processed. When this happens, it triggers Google Cloud to timeout the request and return a HTTP 408, causing cascading errors to the users.</p>
 <h3>The investigation</h3>
-<p>I tried to reproduce the issue on my local machine by limiting the server to only utilise 1 thread, firing the slow request, and then firing multiple requests that were not supposed to be slow in quick succession.</p>
-<p>As expected (not to my advantage), the supposedly fast requests were being slow, and they were <em>suspiciously slow</em> because the response times were <em>almost the same</em> as the slow request!</p>
+<p>I tried to reproduce the issue on my local machine by limiting the server to only utilise 1 thread, firing requests to the slow endpoint, and then firing multiple requests to the fast endpoint in quick succession.</p>
+<p>As expected (not to my advantage), the supposedly fast requests to <code class="language-text">/auth</code> were being slow, and they were <em>suspiciously slow</em> because the response times were <em>almost the same</em> as the slow request on <code class="language-text">/chart</code>!</p>
+<p><span
+      class="gatsby-resp-image-wrapper"
+      style="position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; "
+    >
+      <a
+    class="gatsby-resp-image-link"
+    href="/static/de37d0fcbff92545dca3adb5a4283ed5/e4611/sleep-before.png"
+    style="display: block"
+    target="_blank"
+    rel="noopener"
+  >
+    <span
+    class="gatsby-resp-image-background-image"
+    style="padding-bottom: 20.88607594936709%; position: relative; bottom: 0; left: 0; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAECAYAAACOXx+WAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA60lEQVQY0yXO23KCMBRGYd//lXpv7WFsPSIgh5AQJDUpVEXQcVYB98y+/Nd8Ez9vmHqOl0/JbOdYiCvTtcaTJy5Nh1QF7x9zvhdrdv6eKM5YLLcEYUzTtBhjiKKYojgw3ES7Dk9d2Ig/wqIdf6dOKHul6+4c7S9xIkiFHOPGWDKZo4uS2+1OVdeUpeF8Pj+DYXHlza9G4atnWcmW2bYkyC+jUOUH5l9LVmuPcJ+QpJLN1mcfiVHonEMIgda6B9yewmG8ShxeVhOXLYGqyY8NXS+wrurHCWk6CDXmxyIyNQqHQN0Lh5i1lsfjwT/JSSdl/i66+QAAAABJRU5ErkJggg=='); background-size: cover; display: block;"
+  ></span>
+  <img
+        class="gatsby-resp-image-image"
+        alt="image showing slow requests to /auth and /chart"
+        title="image showing slow requests to /auth and /chart"
+        src="/static/de37d0fcbff92545dca3adb5a4283ed5/f058b/sleep-before.png"
+        srcset="/static/de37d0fcbff92545dca3adb5a4283ed5/c26ae/sleep-before.png 158w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/6bdcf/sleep-before.png 315w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/f058b/sleep-before.png 630w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/40601/sleep-before.png 945w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/78612/sleep-before.png 1260w,
+/static/de37d0fcbff92545dca3adb5a4283ed5/e4611/sleep-before.png 1298w"
+        sizes="(max-width: 630px) 100vw, 630px"
+        style="width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;"
+        loading="lazy"
+      />
+  </a>
+    </span></p>
 <h3>The problem</h3>
 <p>As the title suggests, the problem is caused by the <strong>usage of <code class="language-text">std::thread::sleep</code> in an <code class="language-text">async</code> context</strong>.</p>
-<div class="gatsby-highlight has-highlighted-lines" data-language="rust"><pre class="language-rust"><code class="language-rust"><span class="token keyword">if</span> <span class="token operator">!</span><span class="token macro property">matches!</span><span class="token punctuation">(</span>
-    response<span class="token punctuation">.</span>operation_state<span class="token punctuation">,</span>
-    <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">TOperationState</span><span class="token punctuation">::</span><span class="token constant">RUNNING_STATE</span><span class="token punctuation">)</span>
-        <span class="token operator">|</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">TOperationState</span><span class="token punctuation">::</span><span class="token constant">PENDING_STATE</span><span class="token punctuation">)</span>
-        <span class="token operator">|</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">TOperationState</span><span class="token punctuation">::</span><span class="token constant">INITIALIZED_STATE</span><span class="token punctuation">)</span>
-<span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token namespace">log<span class="token punctuation">::</span></span><span class="token macro property">info!</span><span class="token punctuation">(</span><span class="token string">"execute operation done in {:?}"</span><span class="token punctuation">,</span> start<span class="token punctuation">.</span><span class="token function">elapsed</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">return</span> <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+<div class="gatsby-highlight has-highlighted-lines" data-language="rust"><pre class="language-rust"><code class="language-rust"><span class="token keyword">async</span> <span class="token keyword">fn</span> <span class="token function-definition function">wait_to_finish</span><span class="token punctuation">(</span>
+    <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">,</span>
+    op<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">TOperationHandle</span><span class="token punctuation">,</span>
+    start<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Instant</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span> <span class="token punctuation">-></span> <span class="token namespace">thrift<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">></span> <span class="token punctuation">{</span>
+    <span class="token comment">// ...</span>
+
     <span class="token keyword">let</span> sleep_duration <span class="token operator">=</span> <span class="token function">get_sleep_duration</span><span class="token punctuation">(</span>start<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token namespace">log<span class="token punctuation">::</span></span><span class="token macro property">trace!</span><span class="token punctuation">(</span><span class="token string">" sleeping for {:.2?}"</span><span class="token punctuation">,</span> sleep_duration<span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="gatsby-highlight-code-line">    <span class="token comment">// Oops!</span></span><span class="gatsby-highlight-code-line">    <span class="token namespace">std<span class="token punctuation">::</span>thread<span class="token punctuation">::</span></span><span class="token function">sleep</span><span class="token punctuation">(</span>sleep_duration<span class="token punctuation">)</span><span class="token punctuation">;</span></span>    <span class="token keyword">continue</span><span class="token punctuation">;</span>
+<span class="gatsby-highlight-code-line">    <span class="token comment">// Oops!</span></span><span class="gatsby-highlight-code-line">    <span class="token namespace">std<span class="token punctuation">::</span>thread<span class="token punctuation">::</span></span><span class="token function">sleep</span><span class="token punctuation">(</span>sleep_duration<span class="token punctuation">)</span><span class="token punctuation">;</span></span>
+    <span class="token comment">// ...</span>
 <span class="token punctuation">}</span></code></pre></div>
-<p>I promptly switched the implementation to use <code class="language-text">tokio::time::sleep</code> instead (which fixed the issue), as the documentation of <code class="language-text">std::thread::sleep</code> says:</p>
+<p>I promptly switched the implementation to use <code class="language-text">tokio::time::sleep</code> instead, which fixed the issue:</p>
+<p><span
+      class="gatsby-resp-image-wrapper"
+      style="position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; "
+    >
+      <a
+    class="gatsby-resp-image-link"
+    href="/static/19109672c12aa180165a67f2083b0ae4/dcccd/sleep-after.png"
+    style="display: block"
+    target="_blank"
+    rel="noopener"
+  >
+    <span
+    class="gatsby-resp-image-background-image"
+    style="padding-bottom: 20.253164556962027%; position: relative; bottom: 0; left: 0; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAECAYAAACOXx+WAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA8ElEQVQY002P3W6CQBBGef/HappeNFpRqi5/WwVx2YAKAkXKyumG3nSSSSZzcb7vONllYC3vbGTNPm3w5JWmf1LVdw7JCT+IiOSBTGkOx5Q0U1xvFY/Hg6Io0FpjjGGapnmdtBx492+8eppt0rIQmnaApmnYiYCV6/G5E2TnnDD+wg9jC6zp+2+EsP8s4/84eTVaUMdHcGUVVcTasIlKYtXxYybbtCGM5Aw62XZKFxzTbL6Nec7BKs8py5JxHHFOl5FFWPOyVrxtC1zZsvRLhNXv+oHcAhZLF3ftIax+kp7Z+yFBKGm7blaO4xil/gJ+AQF5KHdt5phKAAAAAElFTkSuQmCC'); background-size: cover; display: block;"
+  ></span>
+  <img
+        class="gatsby-resp-image-image"
+        alt="image showing after fixes of faster /auth route"
+        title="image showing after fixes of faster /auth route"
+        src="/static/19109672c12aa180165a67f2083b0ae4/f058b/sleep-after.png"
+        srcset="/static/19109672c12aa180165a67f2083b0ae4/c26ae/sleep-after.png 158w,
+/static/19109672c12aa180165a67f2083b0ae4/6bdcf/sleep-after.png 315w,
+/static/19109672c12aa180165a67f2083b0ae4/f058b/sleep-after.png 630w,
+/static/19109672c12aa180165a67f2083b0ae4/40601/sleep-after.png 945w,
+/static/19109672c12aa180165a67f2083b0ae4/dcccd/sleep-after.png 1127w"
+        sizes="(max-width: 630px) 100vw, 630px"
+        style="width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;"
+        loading="lazy"
+      />
+  </a>
+    </span></p>
+<p>The documentation of <code class="language-text">std::thread::sleep</code> says:</p>
 <blockquote>
 <p>Puts the current thread to sleep for at least the specified amount of time.</p>
 <p>The thread may sleep longer than the duration specified due to scheduling specifics or
@@ -52,9 +115,9 @@ platform-dependent functionality. It will never sleep less.</p>
     <span class="token keyword">fn</span> <span class="token function-definition function">poll</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">:</span> <span class="token class-name">Pin</span><span class="token operator">&lt;</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">Self</span><span class="token operator">></span><span class="token punctuation">,</span> cx<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">Context</span><span class="token operator">&lt;</span><span class="token lifetime-annotation symbol">'_</span><span class="token operator">></span><span class="token punctuation">)</span> <span class="token punctuation">-></span> <span class="token class-name">Poll</span><span class="token operator">&lt;</span><span class="token keyword">Self</span><span class="token punctuation">::</span><span class="token class-name">Output</span><span class="token operator">></span><span class="token punctuation">;</span>
 <span class="token punctuation">}</span></code></pre></div>
 <blockquote>
-<p><code class="language-text">Pin</code>? <code class="language-text">Poll</code>? What the hell is this? Let me see… oh, okay nevermind.</p>
+<p><code class="language-text">Pin</code>? <code class="language-text">Poll</code>? What the hell is this? Let me see the definitions… oh, okay nevermind.</p>
 </blockquote>
-<p>Suffice to say I quietly stepped away from this, and I just <em>never</em> return <code class="language-text">Future</code>-y things from functions or even try to touch <code class="language-text">Future</code> related things by using <code class="language-text">async fn</code> and <code class="language-text">.await</code> everywhere that I could. Maybe one day I am able to muster the confidence to <em>truly</em> understand it.</p>
+<p>Suffice to say I quietly stepped away from this, and I just <em>never</em> return <code class="language-text">Future</code>-y things from functions or even try to touch <code class="language-text">Future</code> related things by using <code class="language-text">async fn</code> and <code class="language-text">.await</code> everywhere that I could. Maybe one day I am able to muster the confidence and invest time to <em>truly</em> understand the underlying mechanism of <code class="language-text">Future</code>s.</p>
 <p>Don’t get me wrong, I am quite satisfied with how Rust handles async and being extremely explicit, but I do wish there was some tool that would have caught this issue for me, which would have in turn make working with <code class="language-text">async</code> easier.</p>
 <h3>Take aways</h3>
 <p>Some key take-aways:</p>
