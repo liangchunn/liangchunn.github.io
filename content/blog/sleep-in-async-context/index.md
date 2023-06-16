@@ -31,37 +31,42 @@ On the day of release, multiple users reported that there was issues loading res
 
 Looking at the logs, I found that some routes on the server which were not supposed to be slow, **were slow**.
 
-An example is the auth route. This route checks if your auth cookie is still valid, and it should be nearly instant (!), but it was taking **more than 4 seconds**, and sometimes even **more than 10 seconds** to be processed. When this happens, it triggers Google Cloud to timeout the request and return a HTTP 408.
+An example is the `/auth` route. This route checks if your auth cookie is still valid, and it should be nearly instant (!), but it was taking **more than 4 seconds**, and sometimes even **more than 10 seconds** to be processed. When this happens, it triggers Google Cloud to timeout the request and return a HTTP 408, causing cascading errors to the users.
 
 ### The investigation
 
-I tried to reproduce the issue on my local machine by limiting the server to only utilise 1 thread, firing the slow request, and then firing multiple requests that were not supposed to be slow in quick succession.
+I tried to reproduce the issue on my local machine by limiting the server to only utilise 1 thread, firing requests to the slow endpoint, and then firing multiple requests to the fast endpoint in quick succession.
 
-As expected (not to my advantage), the supposedly fast requests were being slow, and they were _suspiciously slow_ because the response times were _almost the same_ as the slow request!
+As expected (not to my advantage), the supposedly fast requests to `/auth` were being slow, and they were _suspiciously slow_ because the response times were _almost the same_ as the slow request on `/chart`!
+
+![image showing slow requests to /auth and /chart](./sleep-before.png)
 
 ### The problem
 
 As the title suggests, the problem is caused by the **usage of `std::thread::sleep` in an `async` context**.
 
-```rust{12-13}
-if !matches!(
-    response.operation_state,
-    Some(TOperationState::RUNNING_STATE)
-        | Some(TOperationState::PENDING_STATE)
-        | Some(TOperationState::INITIALIZED_STATE)
-) {
-    log::info!("execute operation done in {:?}", start.elapsed());
-    return Ok(());
-} else {
+```rust{10-11}
+async fn wait_to_finish(
+    &mut self,
+    op: &TOperationHandle,
+    start: &Instant,
+) -> thrift::Result<()> {
+    // ...
+
     let sleep_duration = get_sleep_duration(start);
     log::trace!(" sleeping for {:.2?}", sleep_duration);
     // Oops!
     std::thread::sleep(sleep_duration);
-    continue;
+
+    // ...
 }
 ```
 
-I promptly switched the implementation to use `tokio::time::sleep` instead (which fixed the issue), as the documentation of `std::thread::sleep` says:
+I promptly switched the implementation to use `tokio::time::sleep` instead, which fixed the issue:
+
+![image showing after fixes of faster /auth route](./sleep-after.png)
+
+The documentation of `std::thread::sleep` says:
 
 > Puts the current thread to sleep for at least the specified amount of time.
 >
@@ -89,9 +94,9 @@ pub trait Future {
 }
 ```
 
-> `Pin`? `Poll`? What the hell is this? Let me see... oh, okay nevermind.
+> `Pin`? `Poll`? What the hell is this? Let me see the definitions... oh, okay nevermind.
 
-Suffice to say I quietly stepped away from this, and I just _never_ return `Future`-y things from functions or even try to touch `Future` related things by using `async fn` and `.await` everywhere that I could. Maybe one day I am able to muster the confidence to _truly_ understand it.
+Suffice to say I quietly stepped away from this, and I just _never_ return `Future`-y things from functions or even try to touch `Future` related things by using `async fn` and `.await` everywhere that I could. Maybe one day I am able to muster the confidence and invest time to _truly_ understand the underlying mechanism of `Future`s.
 
 Don't get me wrong, I am quite satisfied with how Rust handles async and being extremely explicit, but I do wish there was some tool that would have caught this issue for me, which would have in turn make working with `async` easier.
 
