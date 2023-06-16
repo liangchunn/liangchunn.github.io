@@ -11,7 +11,7 @@ The library interfaces with an Impala database via the Thrift interface, namely 
 thrift -out src --gen rs -r ./thrift/TCLIService.thrift
 ```
 
-The synchronous API was first built to test things out (which involves a lot of transformations like transposing rows, getting metadata, and more shenanigans). Then the asynchronous API was built with the help of `bb8` and `thrift-pool` which allows the underlying TCP connections to be reused since they are expensive to reopen every time a query fires.
+The synchronous API was first built to test things out (which involves a lot of transformations like transposing rows, getting metadata, and more shenanigans). Then the asynchronous API was built with the help of [`bb8`](https://crates.io/crates/bb8) and [`thrift-pool`](https://crates.io/crates/thrift-pool) which allows the underlying TCP connections to be reused since they are expensive to reopen every time a query fires.
 
 Since this was the first time I was touching code related to such low-level interfaces, there were some bugs like a query only returning a maximum of `1024` rows due to a limit imposed on the server side, requiring the query to be sent again _on the same session_ with all the same parameters.
 
