@@ -1,23 +1,51 @@
-name: Deploy
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy static content to Pages
+
 on:
+  # Runs on pushes targeting the default branch
   push:
-    branches: [main]
+    branches: ['main']
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets the GITHUB_TOKEN permissions to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
 jobs:
+  # Single deploy job since we're just deploying
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node.js
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Node
         uses: actions/setup-node@v3
         with:
-          node-version: '12.x'
+          node-version: 18
           cache: 'yarn'
       - name: Install dependencies
-        run: yarn install
-      - name: Lint
-        run: yarn lint
-      - name: Deploy
-        run: |
-          git remote set-url origin https://git:${{ secrets.GITHUB_TOKEN }}@github.com/liangchunn/liangchunn.github.io.git
-          yarn build
-          yarn deploy -u "github-actions-bot <support+actions@github.com>"
+        run: yarn
+      - name: Build
+        run: yarn build
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          # Upload dist repository
+          path: './out'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
