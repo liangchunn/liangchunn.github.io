@@ -1,0 +1,29 @@
+.container {
+  max-width: calc(min(760px, 100%));
+  margin: 0 auto;
+  margin-bottom: 4rem;
+}
+
+.header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.heading {
+  margin: 0;
+}
+
+.subheading {
+  margin: 0;
+  font-weight: 500;
+}
+
+.listContainer {
+  & p {
+    line-height: 1.75rem;
+  }
+  & ul li {
+    line-height: 1.75rem;
+  }
+}

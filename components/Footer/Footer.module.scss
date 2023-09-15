@@ -1,0 +1,24 @@
+.container {
+  background: var(--background-paper-color);
+  margin-top: 8rem;
+}
+
+.contentWrapper {
+  max-width: calc(min(760px, 100%));
+  margin: 0 auto;
+  // TODO: this is ugly (see .content global class)
+  padding: 4rem 15px;
+}
+
+.splitPane {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.pane {
+  flex: 1;
+
+  & p:first-child {
+    font-weight: 500;
+  }
+}

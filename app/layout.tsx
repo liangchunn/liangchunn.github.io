@@ -6,7 +6,6 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import Link from "next/link";
 import Footer from "components/Footer";
-import StyledComponentsRegistry from "./registry";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -31,14 +30,12 @@ export default function RootLayout({
         <meta name="theme-color" content="#ede7f6" />
       </head>
       <body>
-        <StyledComponentsRegistry>
-          <nav>
-            <Link href="/">Home</Link>
-            <Link href="/posts">Posts</Link>
-          </nav>
-          <div className="content">{children}</div>
-          <Footer />
-        </StyledComponentsRegistry>
+        <nav>
+          <Link href="/">Home</Link>
+          <Link href="/posts">Posts</Link>
+        </nav>
+        <div className="content">{children}</div>
+        <Footer />
       </body>
     </html>
   );

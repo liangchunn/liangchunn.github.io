@@ -2,50 +2,21 @@
 
 import ProfileImage from "components/ProfileImage";
 import Link from "next/link";
-import { styled } from "styled-components";
-
-const Container = styled.div`
-  max-width: calc(min(760px, 100%));
-  margin: 0 auto;
-  margin-bottom: 4rem;
-`;
-
-const Header = styled.div`
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-`;
-
-const Heading = styled.h1`
-  margin: 0;
-`;
-const Subheading = styled.h2`
-  margin: 0;
-  font-weight: 500;
-`;
-
-const ListContainer = styled.div`
-  & p {
-    line-height: 1.75rem;
-  }
-  & ul li {
-    line-height: 1.75rem;
-  }
-`;
+import styles from "./Home.module.scss";
 
 export default function Home() {
   return (
-    <Container>
-      <Header>
+    <div className={styles.container}>
+      <div className={styles.header}>
         <ProfileImage size="large" />
         <div>
-          <Heading>Hey, I&apos;m Liang Chun</Heading>
-          <Subheading>
+          <div className={styles.heading}>Hey, I&apos;m Liang Chun</div>
+          <div className={styles.subheading}>
             I&apos;m a Rust, TypeScript, and JavaScript Engineer
-          </Subheading>
+          </div>
         </div>
-      </Header>
-      <ListContainer>
+      </div>
+      <div className={styles.listContainer}>
         <p>Some things about me:</p>
         <ul>
           <li>Fullstack Engineer for trivago N.V., Düsseldorf, Germany</li>
@@ -67,7 +38,7 @@ export default function Home() {
             use, or working on making everyone&apos;s lives easier with code
           </li>
         </ul>
-      </ListContainer>
+      </div>
       <p>
         You can find me on{" "}
         <Link href="https://www.linkedin.com/in/liangchunwong/">LinkedIn</Link>
@@ -77,6 +48,6 @@ export default function Home() {
       <p>
         🚧 <em>This site is a work-in-progress</em> 🚧
       </p>
-    </Container>
+    </div>
   );
 }
