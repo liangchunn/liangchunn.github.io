@@ -10,7 +10,7 @@ I recently built a Rust library that allows you to query Impala databases for an
 
 The library interfaces with an Impala database via the Thrift interface, namely via the interface defined by the [`TCLIService.thrift`](https://github.com/apache/hive/blob/master/service-rpc/if/TCLIService.thrift) definition file. Using the Apache Thrift CLI tool, the bindings file for Rust can be generated to be used with the [`thrift`](https://crates.io/crates/thrift) crate.
 
-```sh:Shell
+```sh title="bash"
 thrift -out src --gen rs -r ./thrift/TCLIService.thrift
 ```
 
@@ -48,7 +48,7 @@ As expected (not to my advantage), the supposedly fast requests to `/auth` were 
 
 As the title suggests, the problem is caused by the **usage of `std::thread::sleep` in an `async` context**.
 
-```rust:Rust {10-11}
+```rust {10-11} title="file.rs"
 async fn wait_to_finish(
     &mut self,
     op: &TOperationHandle,
@@ -86,9 +86,9 @@ There was an issue opened in `rust-clippy` titled ["Lint idea: find known-blocki
 
 ### Async mindfield
 
-All of this reminds me of how difficult it is to implement `async` Rust. I remembered one time where I freaked out when I saw the `Future` trait:
+All of this reminds me of how difficult it is to implement `async{:rs}` Rust. I remembered one time where I freaked out when I saw the `Future{:rs}` trait:
 
-```rust:Rust
+```rust title="future.rs"
 pub trait Future {
     type Output;
 
@@ -97,11 +97,11 @@ pub trait Future {
 }
 ```
 
-> `Pin`? `Poll`? What the hell is this? Let me see the definitions... oh, okay nevermind.
+> `Pin{:rs}`? `Poll{:rs}`? What the hell is this? Let me see the definitions... oh, okay nevermind.
 
-Suffice to say I quietly stepped away from this, and I just _never_ return `Future`-y things from functions or even try to touch `Future` related things by using `async fn` and `.await` everywhere that I could. Maybe one day I am able to muster the confidence and invest time to _truly_ understand the underlying mechanism of `Future`s.
+Suffice to say I quietly stepped away from this, and I just _never_ return `Future{:rs}`-y things from functions or even try to touch `Future{:rs}` related things by using `async fn{:rs}` and `.await{:rs}` everywhere that I could. Maybe one day I am able to muster the confidence and invest time to _truly_ understand the underlying mechanism of `Future{:rs}`s.
 
-Don't get me wrong, I am quite satisfied with how Rust handles async and being extremely explicit, but I do wish there was some tool that would have caught this issue for me, which would have in turn make working with `async` easier.
+Don't get me wrong, I am quite satisfied with how Rust handles async and being extremely explicit, but I do wish there was some tool that would have caught this issue for me, which would have in turn make working with `async{:rs}` easier.
 
 ### Take aways
 

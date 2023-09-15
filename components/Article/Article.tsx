@@ -1,5 +1,3 @@
-"use client";
-
 import { format, parseISO } from "date-fns";
 import { getMDXComponent } from "next-contentlayer/hooks";
 import { Post } from "contentlayer/generated";

@@ -3,6 +3,31 @@
   font-size: 1.2rem;
   margin-bottom: 3.5rem;
 
+  & pre {
+    border-radius: 4px;
+    overflow-x: auto;
+    border: 1px solid #dddddd;
+    background: #f6f8fa;
+    font-size: 0.8em;
+  }
+
+  & pre:not([data-language]) {
+    padding: 1em;
+    font-size: 0.85em;
+  }
+
+  & pre[data-language] {
+    padding-top: 1em;
+    padding-bottom: 1em;
+  }
+
+  & :not(pre) > code {
+    font-size: 0.85em;
+    background: var(--code-block-color);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+  }
+  
   & > * {
     max-width: calc(min(760px, 100%));
     margin: 0 auto;
@@ -27,6 +52,22 @@
     margin-top: 0;
     line-height: 1.2;
   }
+  
+  blockquote {
+    border-left: 6px solid var(--text-disabled-color);
+    padding: 0.5rem 1rem;
+    background: var(--background-paper-color);
+    font-size: 1.1rem;
+  }
+  
+  blockquote p {
+    margin: 0;
+  }
+
+  blockquote p:not(:last-child) {
+    margin-bottom: 1em;
+  }
+  
 }
 
 .metadata {

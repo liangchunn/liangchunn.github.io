@@ -1,5 +1,3 @@
-"use client";
-
 import ProfileImage from "components/ProfileImage";
 import Link from "next/link";
 import styles from "./Home.module.scss";

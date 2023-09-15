@@ -1,7 +1,5 @@
-import "normalize.css";
-import "../styles/rehype-prism-plus.css";
 import "../styles/global.css";
-import "prism-themes/themes/prism-vs.css";
+import "../styles/shiki.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import Link from "next/link";
