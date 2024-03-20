@@ -1,10 +1,10 @@
 import { format, parseISO } from "date-fns";
-import { getMDXComponent } from "next-contentlayer/hooks";
-import { Post } from "contentlayer/generated";
+import type { Post } from "content-collections";
 import Link from "next/link";
 import ProfileImage from "components/ProfileImage";
 
 import styles from "./Article.module.scss";
+import { MdxContent } from "components/MdxContent";
 
 type PostProps = {
   post: Post;
@@ -12,7 +12,7 @@ type PostProps = {
 };
 
 export default function Post({ post, hideContent }: PostProps) {
-  const Content = getMDXComponent(post.body.code);
+  const CompiledContent = <MdxContent code={post.body} />;
   const tags = post.tags;
 
   return (
@@ -20,7 +20,7 @@ export default function Post({ post, hideContent }: PostProps) {
       <div>
         {hideContent === true ? (
           <h2>
-            <Link href={post.url}>{post.title}</Link>
+            <Link href={`/posts/${post.slug}`}>{post.title}</Link>
           </h2>
         ) : (
           <h1>{post.title}</h1>
@@ -51,7 +51,7 @@ export default function Post({ post, hideContent }: PostProps) {
           <p className={styles.description}>{post.description}</p>
         ) : null}
       </div>
-      {hideContent !== true && <Content />}
+      {hideContent !== true && CompiledContent}
     </article>
   );
 }

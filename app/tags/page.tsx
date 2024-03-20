@@ -1,5 +1,5 @@
 import Header from "components/Header";
-import { allPosts } from "contentlayer/generated";
+import { allPosts } from "content-collections";
 import { Metadata } from "next";
 import Link from "next/link";
 

@@ -17,7 +17,7 @@ export default function Home() {
       <div className={styles.listContainer}>
         <p>Some things about me:</p>
         <ul>
-          <li>Fullstack Engineer for trivago N.V., Düsseldorf, Germany</li>
+          <li>Fullstack Engineer at trivago N.V., Düsseldorf, Germany</li>
           <li>
             B.Sc. graduate in Computer Engineering from{" "}
             <Link href="https://www.uni-due.de/">

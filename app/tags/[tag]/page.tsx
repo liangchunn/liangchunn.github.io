@@ -1,6 +1,6 @@
 import Article from "components/Article";
 import Header from "components/Header";
-import { allPosts } from "contentlayer/generated";
+import { allPosts } from "content-collections";
 import Link from "next/link";
 
 export const generateStaticParams = async () => {
@@ -37,7 +37,7 @@ export default function Tag({ params }: { params: { tag: string } }) {
       </Header>
       <article>
         {posts.map((post) => (
-          <Article post={post} hideContent key={post._id} />
+          <Article post={post} hideContent key={post.slug} />
         ))}
       </article>
     </>

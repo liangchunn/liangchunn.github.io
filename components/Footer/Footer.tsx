@@ -13,7 +13,9 @@ export default function Footer() {
               <Link href="https://nextjs.org/">Next.js</Link>
             </p>
             <p>
-              <Link href="https://www.contentlayer.dev/">Contentlayer</Link>
+              <Link href="https://www.content-collections.dev">
+                Content Collections
+              </Link>
             </p>
             <p>
               <Link href="https://mdxjs.com/">MDX</Link>

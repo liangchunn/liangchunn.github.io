@@ -11,7 +11,7 @@ body {
   --background-shadow-color: #b9b9b9;
   --border-color: #b9b9b9;
   --code-block-color: #e7e7e7;
-  --primary-color: #ede7f6;
+  --primary-color: #6f42c1;
   --primary-faded-color: #d1c4e9;
 }
 
@@ -27,6 +27,7 @@ body {
   background-color: var(--background-default-color);
   color: var(--text-primary-color);
   scroll-padding-top: calc(48px + 2rem);
+  -webkit-text-size-adjust: 100%;
 }
 
 a {
@@ -55,9 +56,16 @@ hr {
 
 .content {
   padding: 0 15px;
-  margin-top: 4rem;
+  margin-top: 2rem;
   /* 100vh - bottom-margin - top-margin - nav */
-  min-height: calc(100vh - 8rem - 4rem - 48px);
+  min-height: calc(100vh - 8rem - 2rem - 48px);
+}
+
+@media (width >= 600px) {
+  .content {
+    margin-top: 4rem;
+    min-height: calc(100vh - 8rem - 4rem - 48px);
+  }
 }
 
 nav {
@@ -72,11 +80,13 @@ nav {
   padding: 0 15px;
   display: flex;
   gap: 1rem;
+  color: white;
 }
 
 nav > a {
   font-size: 1.1rem;
   text-decoration: none;
+  font-weight: 500;
 }
 
 .rehype-code-title {

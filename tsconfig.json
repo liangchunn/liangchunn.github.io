@@ -20,8 +20,8 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "contentlayer/generated": [
-        "./.contentlayer/generated"
+      "content-collections": [
+        "./.content-collections/generated"
       ]
     },
     "plugins": [
@@ -34,7 +34,7 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".contentlayer/generated",
+    ".content-collections/generated",
     ".next/types/**/*.ts"
   ],
   "exclude": [

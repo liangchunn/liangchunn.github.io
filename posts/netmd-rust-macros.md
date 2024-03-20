@@ -1,6 +1,6 @@
 ---
 title: Extracting NetMD messages with Rust macros
-description: Compile-time typed message extraction for 💽
+description: Compile-time typed message extraction for the NetMD protocol with Rust macros 💽
 date: 2024-03-19
 tags:
   - rust
@@ -29,7 +29,7 @@ After sending a query to a NetMD device, the device first responds with a header
 
 Each data frame that comes from the device has a known format. In the case of reading disc titles, the format looks like this:
 
-```
+```plaintext
 %? 1806 02201801 00%? 3000 0a00 1000 %w0000 %?%?000a %w %*
 ```
 
@@ -74,23 +74,24 @@ I didn't like this code, especially the part where I'm destructuring `data` into
 Rust complains when you do not add the `if let {} else {}` part, as the `let{:rs}` binding _requires_ an [irrefutable pattern](https://doc.rust-lang.org/book/ch18-02-refutability.html) match:
 
 ```ansi title="Shell session"
-[0;1;32m   Compiling[0m scan-test v0.1.0 
-[0;31;1merror[E0005][0;1m: refutable pattern in local binding[0m
- [0;102;1m--> [0mscan-test/src/main.rs:6:9
-  [0;102;1m|[0m
-[0;102;1m6[0m [0;102;1m|[0m     let [a, b] = &data[..];
-  [0;102;1m| [0m        [0;31;1m^^^^^^[0m [0;31;1mpatterns `&[]`, `&[_]` and `&[_, _, _, ..]` not covered[0m
-  [0;102;1m|[0m
-  [0;102;1m= [0;1mnote[0m: `let` bindings require an "irrefutable pattern", like a `struct` or an `enum` with only one variant
-  [0;102;1m= [0;1mnote[0m: for more information, visit https://doc.rust-lang.org/book/ch18-02-refutability.html
-  [0;102;1m= [0;1mnote[0m: the matched value is of type `&[u8]`
-[0;104;1mhelp[0m: you might want to use `let else` to handle the variants that aren't matched
-  [0;102;1m|[0m
-[0;102;1m6[0m [0;102;1m| [0m    let [a, b] = &data[..][0;1;32m else { todo!() }[0m;
-  [0;102;1m|[0m                            [0;1;32m++++++++++++++++[0m
+[1m[32m   Compiling[0m scan-test v0.1.0
+[0m[1m[38;5;9merror[E0005][0m[0m[1m: refutable pattern in local binding[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0mscan-test/src/main.rs:5:9[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m5[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    let [a, b] = &data[..];[0m
+[0m  [0m[0m[1m[38;5;12m| [0m[0m        [0m[0m[1m[38;5;9m^^^^^^[0m[0m [0m[0m[1m[38;5;9mpatterns `&[]`, `&[_]` and `&[_, _, _, ..]` not covered[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `let` bindings require an "irrefutable pattern", like a `struct` or an `enum` with only one variant[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: for more information, visit https://doc.rust-lang.org/book/ch18-02-refutability.html[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: the matched value is of type `&[u8]`[0m
+[0m[1m[38;5;14mhelp[0m[0m: you might want to use `let else` to handle the variants that aren't matched[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m5[0m[0m [0m[0m[1m[38;5;12m| [0m[0m    let [a, b] = &data[..][0m[0m[38;5;10m else { todo!() }[0m[0m;[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m                            [0m[0m[38;5;10m++++++++++++++++[0m
 
-[0;1mFor more information about this error, try `rustc --explain E0005`.[0m
-[0;31;1merror[0;1m:[0m could not compile `scan-test` (bin "scan-test") due to 1 previous error
+[0m[1mFor more information about this error, try `rustc --explain E0005`.[0m
+[1m[31merror[0m[1m:[0m could not compile `scan-test` (bin "scan-test") due to 1 previous error
+
 ```
 
 All these manual extraction and type conversion didn't seem sane to me, as I can still make mistakes such as:
@@ -364,7 +365,7 @@ let block = {
 }
 ```
 
-```
+```plaintext
 quote!(        ╭───────────────────────────────────────────────╮
     {          ↓       {                                       ↓
         #getter;          let value = extracted.get(0).unwrap();
@@ -403,7 +404,7 @@ let tokens =
 }
 ```
 
-```
+```plaintext
 quote!(
     (
         #(#all_tokens),*
@@ -548,21 +549,21 @@ pub fn generate(input: MacroInput) -> TokenStream {
 Now, let's try compiling our example code with `cargo run`:
 
 ```ansi title="Shell session"
-[0;1;32m   Compiling[0m scan-test v0.1.0
-[0;31;1merror[E0277][0;1m: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)[0m
- [0;102;1m--> [0mscan-test/src/main.rs:5:43
-  [0;102;1m|[0m
-[0;102;1m3[0m [0;102;1m|[0m fn main() {
-  [0;102;1m| ---------[0m [0;102;1mthis function should return `Result` or `Option` to accept `?`[0m
-[0;102;1m4[0m [0;102;1m|[0m     let data = &[0xff, 0xbe, 0x01, 0x02, 0x03];
-[0;102;1m5[0m [0;102;1m|[0m     let (a, b) = scan!("ff be %b %w", data).unwrap();
-  [0;102;1m| [0m                                          [0;31;1m^[0m [0;31;1mcannot use the `?` operator in a function that returns `()`[0m
-  [0;102;1m|[0m
-  [0;102;1m= [0;1mhelp[0m: the trait `FromResidual<Result<Infallible, ExtractError>>` is not implemented for `()`
-  [0;102;1m= [0;1mnote[0m: this error originates in the macro `scan` (in Nightly builds, run with -Z macro-backtrace for more info)
+[1m[32m   Compiling[0m scan-test v0.1.0 
+[0m[1m[38;5;9merror[E0277][0m[0m[1m: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0mscan-test/src/main.rs:5:43[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m3[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mfn main() {[0m
+[0m  [0m[0m[1m[38;5;12m| [0m[0m[1m[38;5;12m---------[0m[0m [0m[0m[1m[38;5;12mthis function should return `Result` or `Option` to accept `?`[0m
+[0m[1m[38;5;12m4[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    let data = &[0xff, 0xbe, 0x01, 0x02, 0x03];[0m
+[0m[1m[38;5;12m5[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    let (a, b) = scan!("ff be %b %w", data).unwrap();[0m
+[0m  [0m[0m[1m[38;5;12m| [0m[0m                                          [0m[0m[1m[38;5;9m^[0m[0m [0m[0m[1m[38;5;9mcannot use the `?` operator in a function that returns `()`[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mhelp[0m[0m: the trait `FromResidual<Result<Infallible, ExtractError>>` is not implemented for `()`[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: this error originates in the macro `scan` (in Nightly builds, run with -Z macro-backtrace for more info)[0m
 
-[0;1mFor more information about this error, try `rustc --explain E0277`.[0m
-[0;31;1merror[0;1m:[0m could not compile `scan-test` (bin "scan-test") due to 1 previous error
+[0m[1mFor more information about this error, try `rustc --explain E0277`.[0m
+[1m[31merror[0m[1m:[0m could not compile `scan-test` (bin "scan-test") due to 1 previous error
 ```
 
 Oops, we hit a compile error.
@@ -657,12 +658,12 @@ fn main() {
 Running `cargo run` outputs:
 
 ```ansi title="Shell session"
-[0;1;32m   Compiling[0m scan-core v0.1.0 
-[0;1;32m   Compiling[0m scan-macros v0.1.0
-[0;1;32m   Compiling[0m scan v0.1.0 
-[0;1;32m   Compiling[0m scan-test v0.1.0
-[0;1;32m    Finished[0m dev [unoptimized + debuginfo] target(s) in 0.44s
-[0;1;32m     Running[0m `target/debug/scan-test`
+[1m[32m   Compiling[0m scan-core v0.1.0 
+[1m[32m   Compiling[0m scan-macros v0.1.0 
+[1m[32m   Compiling[0m scan v0.1.0
+[1m[32m   Compiling[0m scan-test v0.1.0
+[1m[32m    Finished[0m dev [unoptimized + debuginfo] target(s) in 0.55s
+[1m[32m     Running[0m `target/debug/scan-test`
 a = 1, b = 515
 c = 1, d = 515
 ```

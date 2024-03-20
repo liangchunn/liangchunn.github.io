@@ -2,6 +2,10 @@
   max-width: calc(min(760px, 100%));
   margin: 0 auto;
   margin-bottom: 4rem;
+  font-size: 1rem;
+  @media (width >= 600px) {
+    font-size: 1.2rem;
+  }
 }
 
 .header {
@@ -21,9 +25,9 @@
 
 .listContainer {
   & p {
-    line-height: 1.75rem;
+    line-height: 1.75;
   }
   & ul li {
-    line-height: 1.75rem;
+    line-height: 1.75;
   }
 }
