@@ -29,7 +29,7 @@ export default function Post({ post, hideContent }: PostProps) {
           <time dateTime={post.date}>
             {format(parseISO(post.date), "LLL d, yyyy")}
           </time>
-          <span>{post.readingTime.text}</span>
+          <span>{post.readingTime}</span>
           {tags && (
             <span>
               {tags.map((tag) => (

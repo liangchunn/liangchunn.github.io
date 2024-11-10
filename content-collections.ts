@@ -68,7 +68,7 @@ const posts = defineCollection({
     );
     return {
       ...data,
-      readingTime: readingTime(content),
+      readingTime: readingTime(content).text,
       slug: data._meta.path,
       body,
     };
